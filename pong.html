@@ -392,7 +392,7 @@ def update(t):
                 audio.play()
             else:
                 ended = True
-                audio = window.Audio.new(window.SOUNDS['new_explosion'])
+                audio = window.Audio.new(window.SOUNDS['explosion'])
                 audio.play()
         if ballpos[0] > WD:
             if abs(aih - ballpos[1]) <= paddlelen/2 + abs(ballvel[1]/ballvel[0])*abs(ballpos[0]-WD)+10:
