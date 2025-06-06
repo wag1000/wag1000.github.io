@@ -368,14 +368,14 @@ def update(t):
         elif aih - wantedpos > speed:
             changeval = -speed
         else:
-            changeval = 0
+            changeval = wantedpos - aih
         aih += changeval
         if paddleh - mouse.pos[1] < -speed:
             changeval = speed
         elif paddleh - mouse.pos[1] > speed:
             changeval = -speed
         else:
-            changeval = 0
+            changeval = mouse.pos[1] - paddleh
         paddleh += changeval
         if ballpos[1] > HT or ballpos[1] < 0:
             ballvel[1] = -ballvel[1]
