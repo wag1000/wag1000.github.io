@@ -331,6 +331,7 @@ def resizeCanvas(_):
     scale = min(
         window.innerWidth / (canvas.width),
         window.innerHeight / (canvas.height))
+    scale = math.floor(scale)
     canvas.style.width = f'{round(scale * canvas.width)}px'
     canvas.style.height = f'{round(scale * canvas.height)}px'
     mouse.scale = scale
