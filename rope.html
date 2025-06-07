@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<div align="center">
+<canvas id="canvas" 
+        width="2400" 
+        height="1200"></canvas>
+</div>
+<h1 id='text'></h1>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_Vec2', '__pwe_draw']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_Vec2">
+import math
+from browser import document, window, aio
+
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    
+    def norm(self):
+        return math.sqrt(self.x**2 + self.y**2)
+    
+    def normalize(self):
+        n = self.norm()
+        if n != 0:
+            return Vec2(self.x/n, self.y/n)
+        raise ZeroDivisionError("vector has length zero")
+
+    def dot(self, vect):
+        return self.x*vect.x+self.y*vect.y
+
+    def rot90(self):
+        return Vec2(self.y, -self.x)
+
+    def rot180(self):
+        return Vec2(-self.x, -self.y)
+    
+    def rot270(self):
+        vec = self
+        for i in range(0, 2):
+            vec = vec.rot90()
+        return vec
+            
+    def __repr__(self):
+        return f"Vec2({self.x}, {self.y})"
+
+    def __eq__(self, vec):
+        return self.x == vec.x and self.y == vec.y
+            
+    def __add__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x + vec.x, self.y + vec.y)
+        return Vec2(self.x + vec, self.y + vec)
+    
+    def __radd__(self, n):
+        return Vec2(self.x + n, self.y + n)
+    
+    def __sub__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x - vec.x, self.y - vec.y)
+        return Vec2(self.x - vec, self.y - vec)
+    
+    def __mul__(self, n):
+        if isinstance(n, Vec2):
+            raise ValueError("no vector to vector multiplication")
+        return Vec2(self.x*n, self.y*n)
+    
+    def __rmul__(self, n):
+        return self*n
+    
+    def __truediv__(self, n):
+        return Vec2(self.x/n, self.y/n)
+    
+    def __getitem__(self, idx):
+        vec = [self.x, self.y]
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        return vec[idx]
+    
+    def __setitem__(self, idx, val):
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        if idx == -2:
+            self.x = val
+        elif idx == -1:
+            self.y = val
+        elif idx == 0:
+            self.x = val
+        elif idx == 1:
+            self.y = val
+</script>
+
+<script type="text/python" id="__pwe_draw">
+import math
+from browser import console
+
+class Drawing:
+    def __init__(self, CTX):
+        self.CTX = CTX
+
+        
+    def draw_circle(self, x, y, radius, color='black', filled=False, width=1):
+        "Draw a circle at (x,y) with given radius"
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, radius, 0, math.pi * 2)
+        if (filled):
+            self.CTX.fillStyle = color
+            self.CTX.fill()
+        else:
+            self.CTX.strokeStyle = color
+            self.CTX.lineWidth = width
+            self.CTX.stroke()
+        
+        
+    def drawRectangle(self, x, y, width, height, color):
+        self.CTX.fillStyle = color
+        self.CTX.fillRect(
+            round(x),
+            round(y),
+            round(width),
+            round(height)) 
+    
+
+    def draw_line(self, x1, y1, x2, y2, color='black', width=1):
+        "Draw a line from (x1,y1) to (x2,y2)"
+        self.CTX.strokeStyle = color
+        self.CTX.lineWidth = width
+        self.CTX.beginPath()
+        self.CTX.moveTo(x1, y1)
+        self.CTX.lineTo(x2, y2)
+        self.CTX.stroke()
+</script>
+
+<script type="text/python" id="pythoncode">
+# Write python on this side
+from browser import document, window, aio, console, bind
+from Vec2 import *
+from draw import *
+import random
+
+
+canvas = document.getElementById("canvas")
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+
+
+Draw = Drawing(CTX)
+
+class Bucket:
+    """Class that defaults to False on attribute access.
+    Otherwise allows easy assignment and clearing of all attributes.
+    """
+    def __init__(self):
+        self._mydata = dict()
+
+    def __getattr__(self, attr):
+        return self._mydata.get(attr, False)
+
+    def __setattr__(self, name, value):
+        # Special handling for our internal _mydata dictionary
+        if name == '_mydata':
+            super().__setattr__(name, value)
+        else:
+            self._mydata[name] = value
+
+    def clear(self):
+        self._mydata.clear()
+
+        
+keyboard = Bucket()
+
+class Joint:
+    def __init__(self, m, linked, dist, vel: Vec2, pos: Vec2):
+        self.linked_joint = linked
+        self.dist = dist
+        self.pos = pos
+        self.vel = vel
+        self.mass = m#*dist/2.5
+
+    def applyforce(self, force):
+        self.vel += force/self.mass
+
+    def adjustpos(self):
+        diff = (self.pos-self.linked_joint.pos).norm()-self.dist
+        self.pos -= diff*((self.pos-self.linked_joint.pos).normalize())
+
+    def update(self):
+        self.applyforce(Vec2(0, 0.005)*self.mass)
+        self.lvel = self.linked_joint.vel
+        relvel = self.lvel-self.vel
+        unwantvel = relvel.dot((self.linked_joint.pos-self.pos).normalize())*(self.linked_joint.pos-self.pos).normalize()
+        newrelvel = relvel - unwantvel
+        self.vel = self.lvel-newrelvel
+        self.linked_joint.applyforce(unwantvel.rot180())
+        #self.applyforce(unwantvel.rot90())
+        self.vel *= 0.999
+        self.pos += self.vel
+        self.adjustpos()
+        #assert round((self.linked_joint.pos-self.pos).norm()) == self.dist, f"Distance is wrong {(self.linked_joint.pos-self.pos).norm()}"
+        #console.log(f"{self.vel}")
+
+    def draw(self):
+        Draw.draw_line(self.pos.x, self.pos.y, self.linked_joint.pos.x, self.linked_joint.pos.y, width = 3)
+
+class AnchorPoint(Joint):
+    def __init__(self, pos):
+        super().__init__(1, None, 1, Vec2(0, 0), pos)
+
+    def applyforce(self, force):
+        pass
+
+    def update(self):
+        pass
+
+    def draw(self):
+        Draw.draw_circle(self.pos.x, self.pos.y, 5, filled = True)
+
+Anchor = AnchorPoint(Vec2(WD/2, HT/2))
+joints = [Joint(1, Anchor, 10, Vec2(0, 3), Vec2(WD/2+10, HT/2))]
+for i in range(1, 960):
+    joints.append(Joint(1, joints[i-1], 10, Vec2(random.uniform(0, 1.5), random.uniform(0, 1.5)), Vec2(WD/2+10, HT/2+i*10)))
+# joints.append(Joint(1.05, Anchor, 20, Vec2(random.uniform(0, 12), random.uniform(0, 12)), Vec2(WD/2+20, HT/2)))
+# for i in range(1, 30):
+#     joints.append(Joint(1.05, joints[i+239], 20, Vec2(random.uniform(0, 1.5), random.uniform(0, 1.5)), Vec2(WD/2+20, HT/2+i*20)))
+# #joints[120].linked_joint = joints[len(joints)-1]
+# joints.append(Joint(1, Anchor, 5, Vec2(random.uniform(0, 12), random.uniform(0, 12)), Vec2(WD/2+5, HT/2)))
+# for i in range(1, 120):
+#     joints.append(Joint(1, joints[i], 5, Vec2(random.uniform(0, 1.5), random.uniform(0, 1.5)), Vec2(WD/2+5, HT/2+i*5)))
+# joints.append(Joint(1, Anchor, 10, Vec2(random.uniform(0, 12), random.uniform(0, 12)), Vec2(WD/2+10, HT/2)))
+# for i in range(1, 60):
+#     joints.append(Joint(1, joints[i], 10, Vec2(random.uniform(0, 1.5), random.uniform(0, 1.5)), Vec2(WD/2+10, HT/2+i*10)))
+
+downlast = False
+
+
+# @bind(document, "keydown")
+# def keyDownHandler(e):
+#     global keyboard,ready
+#     if e.key.isalpha():
+#         setattr(keyboard, e.key, True)
+#     elif e.key == '.':
+#         keyboard.slash = True
+#     # if not ready:
+#     #     ready = True
+@bind(document, "keypress")
+def keyPressHandler(e):
+    global keyboard,ready
+    if e.key.isalpha():
+        setattr(keyboard, e.key, True)
+        
+# @bind(document, "keyup")
+# def keyUpHandler(e):
+#     global keyboard
+#     if e.key.isalpha():
+#         setattr(keyboard, e.key, False)
+#     elif e.key == '.':
+#         keyboard.slash = False
+# #     if e.keyCode == 39:
+# #         panel.rightPressed = False
+# #     elif e.keyCode == 37:
+# #         panel.leftPressed = False   
+
+def draw():
+    Draw.drawRectangle(0, 0, WD, HT, color = "#fff")
+    for joint in joints:
+        joint.draw()
+    Anchor.draw()
+
+async def update(t):
+    for i in range(len(joints)):
+        joint = joints[i]
+        joint.update()
+    if keyboard.p and not downlast:
+        joints[random.randint(0, 242)].vel += Vec2(random.uniform(-10, 10), random.uniform(-10, 10))
+        joints[random.randint(242, len(joints))].vel += Vec2(random.uniform(-10, 10), random.uniform(-10, 10))
+        # joints[random.randint(0, len(joints))].vel += Vec2(random.uniform(-10, 10), random.uniform(-10, 10))
+        # joints[random.randint(0, len(joints))].vel += Vec2(random.uniform(-10, 10), random.uniform(-10, 10))
+        console.log("clicked")
+        downlast = True
+    if not keyboard.p:
+        downlast = False
+    draw()
+    #await aio.sleep(1.05)
+    window.requestAnimationFrame(update)
+
+aio.run(update(0))
+</script>
+</body>
+</html>
