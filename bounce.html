@@ -1,0 +1,402 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- Write HTML on this side -->
+<div align="center">
+<canvas id="canvas" 
+        width="2400" 
+        height="1200"></canvas>
+</div>
+<h1 id='text'></h1>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_Vec2', '__pwe_draw']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_Vec2">
+import math
+from browser import document, window, aio
+
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    
+    def norm(self):
+        return math.sqrt(self.x**2 + self.y**2)
+    
+    def normalize(self):
+        n = self.norm()
+        if n != 0:
+            return Vec2(self.x/n, self.y/n)
+        raise ZeroDivisionError("vector has length zero")
+
+    def rot90(self):
+        return Vec2(self.y, -self.x)
+    
+    def rot270(self):
+        vec = self
+        for i in range(0, 2):
+            vec = vec.rot90()
+
+    def dot(self, vect):
+        return self.x*vect.x + self.y*vect.y
+            
+    def __repr__(self):
+        return f"Vec2({self.x}, {self.y})"
+
+    def __eq__(self, vec):
+        return self.x == vec.x and self.y == vec.y
+            
+    def __add__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x + vec.x, self.y + vec.y)
+        return Vec2(self.x + vec, self.y + vec)
+    
+    def __radd__(self, n):
+        return Vec2(self.x + n, self.y + n)
+    
+    def __sub__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x - vec.x, self.y - vec.y)
+        return Vec2(self.x - vec, self.y - vec)
+    
+    def __mul__(self, n):
+        if isinstance(n, Vec2):
+            raise ValueError("no vector to vector multiplication")
+        return Vec2(self.x*n, self.y*n)
+    
+    def __rmul__(self, n):
+        return self*n
+    
+    def __truediv__(self, n):
+        return Vec2(self.x/n, self.y/n)
+    
+    def __getitem__(self, idx):
+        vec = [self.x, self.y]
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        return vec[idx]
+    
+    def __setitem__(self, idx, val):
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        if idx == -2:
+            self.x = val
+        elif idx == -1:
+            self.y = val
+        elif idx == 0:
+            self.x = val
+        elif idx == 1:
+            self.y = val
+</script>
+
+<script type="text/python" id="__pwe_draw">
+import math
+from browser import console
+
+class Drawing:
+    def __init__(self, CTX):
+        self.CTX = CTX
+
+        
+    def draw_circle(self, x, y, radius, color='black', filled=False, width=1):
+        "Draw a circle at (x,y) with given radius"
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, radius, 0, math.pi * 2)
+        if (filled):
+            self.CTX.fillStyle = color
+            self.CTX.fill()
+        else:
+            self.CTX.strokeStyle = color
+            self.CTX.lineWidth = width
+            self.CTX.stroke()
+        
+        
+    def drawRectangle(self, x, y, width, height, color):
+        self.CTX.fillStyle = color
+        self.CTX.fillRect(
+            round(x),
+            round(y),
+            round(width),
+            round(height)) 
+    
+
+    def draw_line(self, x1, y1, x2, y2, color='black', width=1):
+        "Draw a line from (x1,y1) to (x2,y2)"
+        self.CTX.strokeStyle = color
+        self.CTX.lineWidth = width
+        self.CTX.beginPath()
+        self.CTX.moveTo(x1, y1)
+        self.CTX.lineTo(x2, y2)
+        self.CTX.stroke()
+        
+    def draw_spring(self, pos1, pos2, peaks, color = "black", width = 1, springwidth = 10):
+        positions = []
+        diff = pos2 - pos1
+        for i in range(peaks+1):
+            if i%2 == 0:
+                pos = pos1 + ((diff/peaks)*i) + ((diff.normalize()*springwidth)).rot90()
+            else:
+                pos = pos1 + ((diff/peaks)*i) - ((diff.normalize()*springwidth)).rot90()
+            positions.append(pos)
+        for i in range(len(positions)-1):
+            pos = positions[i]
+            pos_2 = positions[i+1]
+            console.log(f"{pos == pos1}")
+            console.log(f"{pos_2 == pos1}")
+            self.draw_line(pos.x, pos.y, pos_2.x, pos_2.y, color, width)
+        positions = []
+        for i in range(peaks+1):
+            if i%2 == 0:
+                pos = pos1 + ((diff/peaks)*i) - ((diff.normalize()*springwidth)).rot90()
+            else:
+                pos = pos1 + ((diff/peaks)*i) + ((diff.normalize()*springwidth)).rot90()
+            positions.append(pos)
+        for i in range(len(positions)-1):
+            pos = positions[i]
+            pos_2 = positions[i+1]
+            console.log(f"{pos == pos1}")
+            console.log(f"{pos_2 == pos1}")
+            self.draw_line(pos.x, pos.y, pos_2.x, pos_2.y, color, width)
+</script>
+
+<script type="text/python" id="pythoncode">
+# Write python on this side
+from browser import document, window, aio, console, bind
+from Vec2 import Vec2
+from draw import Drawing
+import random
+import math
+
+canvas = document.getElementById("canvas")
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+
+Draw = Drawing(CTX)
+
+p = []
+v = []
+m = []
+c = []
+paused = False
+num = int(input("How many objects?"))
+coloured = int(input("How many objects should be coloured?"))
+if coloured > 0:
+    colour = input("What colour?\nWrite as 3 digit hexadecimal. ")
+
+for i in range(num):
+    pos = Vec2(random.randint(100, 2000), random.randint(100, 1000))
+    vel = Vec2(random.randint(-20, 20), random.randint(-20, 20))
+    while pos in p or vel in v:
+        pos = Vec2(random.randint(100, 2000), random.randint(100, 1000))
+        vel = Vec2(random.randint(-10, 10), random.randint(-10, 10))
+    p.append(pos)
+    v.append(vel)
+    m.append(1)
+    if i < int(coloured):
+        c.append(colour)
+    else:
+        c.append("black")
+
+class Bucket:
+    """Class that defaults to False on attribute access.
+    Otherwise allows easy assignment and clearing of all attributes.
+    """
+    def __init__(self):
+        self._mydata = dict()
+
+    def __getattr__(self, attr):
+        return self._mydata.get(attr, False)
+
+    def __setattr__(self, name, value):
+        # Special handling for our internal _mydata dictionary
+        if name == '_mydata':
+            super().__setattr__(name, value)
+        else:
+            self._mydata[name] = value
+
+    def clearall(self):
+        self._mydata.clear()
+
+        
+keyboard = Bucket()
+
+@bind(document, "keypress")
+def keyPressHandler(e):
+    global keyboard
+    if e.key.isalpha():
+        setattr(keyboard, e.key, True)
+        
+
+movewallx = 100
+movewalllen = 100
+movewallvel = 10
+
+expectedlen = 8
+downlast = False
+
+# class Keyboard:
+#     def __init__(self):
+#         self.clear()
+        
+#     def clear(self):
+#         self.p = False
+
+        
+# keyboard = Keyboard()
+
+# @bind(document, "keydown")
+# def keyDownHandler(e):
+#     global keyboard
+#     if e.key in 'p':
+#         setattr(keyboard, e.key, True)
+
+
+        
+# @bind(document, "keyup")
+# def keyUpHandler(e):
+#     global keyboard
+#     if e.key in 'p':
+#         setattr(keyboard, e.key, False)
+
+
+def adjustpos(pos1, pos2, v1, v2, r):
+    new1 = pos1
+    new2 = pos2
+    if v1.norm() > v2.norm():
+        inc1 = v1/v1.norm()
+        inc2 = v2/v1.norm()
+    else:
+        inc1 = v1/v2.norm()
+        inc2 = v2/v2.norm()
+    while (new1-new2).norm() < 2*r:
+        new1 -= inc1
+        new2 -= inc2
+    return [new1, new2]
+
+def al_adjustpos(a, b, v, v2, r, r2):
+    c = a.x-b.x
+    d = a.y-b.y
+    e = v2.x-v.x
+    f = v2.y-v.y
+    g = e**2+f**2
+    h = 2*(c*e+d*f)
+    i = c**2 + d**2 - (r+r2)**2
+    t = (-h + math.sqrt(h**2-(4*g*i)))/2*g
+    new1 = a-(v*t)
+    new2 = b-(v2*t)
+    return [new1, new2]
+
+def circle_collide(pos1, pos2, r1, r2):
+    dist = r1 + r2
+    return (pos1 - pos2).norm() <= dist
+
+def update(t):
+    global pos, v, expectedlen, paused, downlast
+    dellist = []
+    expectedlen = len(p)
+    if keyboard.p and not downlast:
+        paused = not paused
+        downlast = True
+    if not keyboard.p:
+        downlast = False
+    for i, pos in enumerate(p):
+        if not paused:
+            if pos.x >= 2400 or pos.x <= 0 or pos.y >= 1200 or pos.y <= 0:
+                p[i] = Vec2(random.randint(100, 2000), random.randint(100, 1000))
+            if (pos.x <= 40 and v[i].x < 0) or (pos.x >= 2360 and v[i].x > 0):
+                v[i] = Vec2(-v[i].x, v[i].y)
+            if (pos.y <= 40 and v[i].y < 0) or (pos.y >= 1160 and v[i].y > 0):
+                v[i] = Vec2(v[i].x, -v[i].y)
+            for ia, posa in enumerate(p):
+                if i == ia:
+                    continue
+                if circle_collide(pos, posa, 20, 20):
+                    # dellist.append(i)
+                    # expectedlen -= 2
+                    newpos = al_adjustpos(pos, posa, v[i], v[ia], 20, 20)
+                    posn = newpos[0]
+                    posna = newpos[1]
+                    dir = (posna-posn).normalize()
+                    v1pa = v[i].dot(dir)*dir
+                    v2pa = v[ia].dot(dir)*dir
+                    nv2pa = (2*m[i]/(m[i]+m[ia]))*v1pa + ((1 - m[i])/(m[ia]+m[i]))*v2pa
+                    console.log(nv2pa == v[ia])
+                    nv1pa = v1pa*m[i]+v2pa*m[ia]-nv2pa*m[ia]
+                    v[i] = nv1pa + (v[i]-v1pa)
+                    v[ia] = nv2pa + (v[ia]-v2pa)
+                    
+                    
+            p[i] += v[i]
+
+        
+    # for i in dellist:
+    #     #console.log((i-1) > len(p))
+    #     for ia, item in enumerate(dellist):
+    #         if item > i:
+    #             dellist[ia] = item - 1
+    #     p.pop(i)
+    #     v.pop(i)
+
+    draw()
+    keyboard.clearall()
+    window.requestAnimationFrame(update)
+
+def draw():
+    Draw.drawRectangle(0, 0, canvas.width, canvas.height, "#fff")
+    for i, pos in enumerate(p):
+        Draw.draw_circle(pos.x, pos.y, radius = 20, color = c[i], filled = True)
+    Draw.draw_line(20, 0, 20, 1200)
+    Draw.draw_line(2380, 0, 2380, 1200)
+    Draw.draw_line(0, 20, 2400, 20)
+    Draw.draw_line(0, 1180, 2400, 1180)
+
+    
+update(0)      
+</script>
+</body>
+</html>
