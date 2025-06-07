@@ -240,6 +240,8 @@ class Joint:
         self.vel = self.lvel-newrelvel
         self.linked_joint.applyforce(unwantvel.rot180())
         #self.applyforce(unwantvel.rot90())
+        if isinstance(self.linked_joint, Joint):
+            self.applyforce(self.linked_joint.linked_joint.pos - self.pos + (self.linked_joint.pos - self.pos)*2)
         self.vel *= 0.999
         self.pos += self.vel
         self.adjustpos()
