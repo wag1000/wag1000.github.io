@@ -264,7 +264,7 @@ class AnchorPoint(Joint):
 
 Anchor = AnchorPoint(Vec2(WD/2, HT/2))
 joints = [Joint(1, Anchor, 10, Vec2(0, 3), Vec2(WD/2+10, HT/2))]
-for i in range(1, 100):
+for i in range(1, 50):
     joints.append(Joint(1, joints[i-1], 10, Vec2(random.uniform(0, 1.5), random.uniform(0, 1.5)), Vec2(WD/2+10, HT/2+i*10)))
 # joints.append(Joint(1.05, Anchor, 20, Vec2(random.uniform(0, 12), random.uniform(0, 12)), Vec2(WD/2+20, HT/2)))
 # for i in range(1, 30):
