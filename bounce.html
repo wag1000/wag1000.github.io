@@ -358,7 +358,7 @@ def update(t):
                 if circle_collide(pos, posa, 20, 20):
                     # dellist.append(i)
                     # expectedlen -= 2
-                    newpos = al_adjustpos(pos, posa, v[i], v[ia], 20, 20)
+                    newpos = adjustpos(pos, posa, v[i], v[ia], 20, 20)
                     posn = newpos[0]
                     posna = newpos[1]
                     dir = (posna-posn).normalize()
