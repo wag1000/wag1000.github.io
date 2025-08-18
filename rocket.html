@@ -1,0 +1,367 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<div align="center">
+<canvas id="canvas" 
+        width="2400" 
+        height="1200"></canvas>
+</div>
+<h1 id='text'></h1>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_Vec2', '__pwe_Mouse', '__pwe_drawing']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_Vec2">
+import math
+from browser import document, window, aio
+
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    
+    def norm(self):
+        return math.sqrt(self.x**2 + self.y**2)
+    
+    def normalize(self):
+        n = self.norm()
+        if n != 0:
+            return Vec2(self.x/n, self.y/n)
+        raise ZeroDivisionError("vector has length zero")
+
+    def rot90(self):
+        return Vec2(self.y, -self.x)
+    
+    def rot270(self):
+        vec = self
+        for i in range(0, 2):
+            vec = vec.rot90()
+            
+    def __repr__(self):
+        return f"Vec2({self.x}, {self.y})"
+
+    def __eq__(self, vec):
+        return self.x == vec.x and self.y == vec.y
+            
+    def __add__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x + vec.x, self.y + vec.y)
+        return Vec2(self.x + vec, self.y + vec)
+    
+    def __radd__(self, n):
+        return Vec2(self.x + n, self.y + n)
+    
+    def __sub__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x - vec.x, self.y - vec.y)
+        return Vec2(self.x - vec, self.y - vec)
+    
+    def __mul__(self, n):
+        if isinstance(n, Vec2):
+            raise ValueError("no vector to vector multiplication")
+        return Vec2(self.x*n, self.y*n)
+    
+    def __rmul__(self, n):
+        return self*n
+    
+    def __truediv__(self, n):
+        return Vec2(self.x/n, self.y/n)
+    
+    def __getitem__(self, idx):
+        vec = [self.x, self.y]
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        return vec[idx]
+    
+    def __setitem__(self, idx, val):
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        if idx == -2:
+            self.x = val
+        elif idx == -1:
+            self.y = val
+        elif idx == 0:
+            self.x = val
+        elif idx == 1:
+            self.y = val
+
+
+            
+
+</script>
+
+<script type="text/python" id="__pwe_Mouse">
+class Mouse:
+    def __init__(self, canvas):
+        self.canvas = canvas
+        self.ldown = False
+        self.rdown = False
+        self.pos = [0, 0]
+        self.canvas.bind("mousedown", self.onmousedown)
+        self.canvas.bind("mouseup", self.onmouseup)
+        self.canvas.bind("mousemove", self.onmousemove)
+    
+    def onmousedown(self, event):
+        if event.button == 0:
+            self.ldown = True
+        elif event.button == 1:
+            self.rdown = True
+        self.getpos(event)
+        
+    def onmouseup(self, event):
+        if event.button == 0:
+            self.ldown = False
+        elif event.button == 1:
+            self.rdown = False
+        self.getpos(event)
+        
+    def onmousemove(self, event):
+        self.getpos(event)
+     
+    def getpos(self, event):
+        rect = self.canvas.getBoundingClientRect()
+        self.pos[0] = event.clientX - rect.left
+        self.pos[1] = event.clientY - rect.top
+</script>
+
+<script type="text/python" id="__pwe_drawing">
+import math
+from browser import console
+
+class Drawing:
+    def __init__(self, CTX):
+        self.CTX = CTX
+
+        
+    def draw_circle(self, x, y, radius, color='black', filled=False, width=1):
+        "Draw a circle at (x,y) with given radius"
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, radius, 0, math.pi * 2)
+        if (filled):
+            self.CTX.fillStyle = color
+            self.CTX.fill()
+        else:
+            self.CTX.strokeStyle = color
+            self.CTX.lineWidth = width
+            self.CTX.stroke()
+        
+        
+    def drawRectangle(self, x, y, width, height, color):
+        self.CTX.fillStyle = color
+        self.CTX.fillRect(
+            round(x),
+            round(y),
+            round(width),
+            round(height)) 
+    
+
+    def draw_line(self, x1, y1, x2, y2, color='black', width=1):
+        "Draw a line from (x1,y1) to (x2,y2)"
+        self.CTX.strokeStyle = color
+        console.log(width)
+        self.CTX.lineWidth = width
+        self.CTX.beginPath()
+        self.CTX.moveTo(x1, y1)
+        self.CTX.lineTo(x2, y2)
+        self.CTX.stroke()
+        
+
+            
+</script>
+
+<script type="text/python" id="pythoncode">
+from Vec2 import Vec2
+from Mouse import Mouse
+from drawing import Drawing
+import math
+import random
+from browser import document, window, aio, console, bind
+
+canvas = document.getElementById("canvas")
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+
+draw = Drawing(CTX)
+
+class Bucket:
+    """Class that defaults to False on attribute access.
+    Otherwise allows easy assignment and clearing of all attributes.
+    """
+    def __init__(self):
+        self._mydata = dict()
+
+    def __getattr__(self, attr):
+        return self._mydata.get(attr, False)
+
+    def __setattr__(self, name, value):
+        # Special handling for our internal _mydata dictionary
+        if name == '_mydata':
+            super().__setattr__(name, value)
+        else:
+            self._mydata[name] = value
+
+    def clear(self):
+        self._mydata.clear()
+
+        
+keyboard = Bucket()
+
+def draw_rect(p1, p2, length, colour = "black"):
+    draw.draw_line((p1 + (p2 - p1)/2).x, (p1 + (p2 - p1)/2).y, ((p1 + (p2 - p1)/2) - ((p2 - p1).normalize()*length/2).rot90()).x, ((p1 + (p2 - p1)/2) - ((p2 - p1).normalize()*length/2).rot90()).y, colour, width = (p2 - p1).norm()/2)
+    draw.draw_line((p1 + (p2 - p1)/2).x, (p1 + (p2 - p1)/2).y, ((p1 + (p2 - p1)/2) + ((p2 - p1).normalize()*length/2).rot90()).x, ((p1 + (p2 - p1)/2) + ((p2 - p1).normalize()*length/2).rot90()).y, colour, width = (p2 - p1).norm()/2)
+
+center = Vec2(400, 600)
+length = 100
+width = 10
+rad = 1.5*math.pi
+rotvel = 0
+mass = 0.01
+g = 5
+xel = Vec2(0, 0)
+vel = Vec2(0, -2)
+stars = [Vec2(random.randint(0, WD), random.randint(0, HT)) for i in range(50)]
+def l_rpos(center, rad, width):
+    diff = Vec2(math.cos(rad-0.5*math.pi)*width/2, math.sin(rad-0.5*math.pi)*width/2)
+    return center + diff, center - diff
+#draw_rect(Vec2(200, 600), Vec2(500, 700), 500, "green")
+lpos, rpos = l_rpos(center, rad, width)
+planetpos = [Vec2(800, 600), Vec2(1000, 600)]
+planetv = [Vec2(0, 0), Vec2(0, -1.5)]
+planetxel = [Vec2(0, 0) for i in planetpos]
+planetm = [100, 20]
+radii = [20, 10]
+draw.draw_line(lpos.x, lpos.y, rpos.x, rpos.y)
+@bind(document, "keydown")
+def keyDownHandler(e):
+    global keyboard,ready
+    if e.key.isalpha():
+        setattr(keyboard, e.key, True)
+@bind(document, "keyup")
+def keyUpHandler(e):
+    global keyboard
+    if e.key.isalpha():
+        setattr(keyboard, e.key, False)
+
+def draw_stuff():
+    draw.drawRectangle(0, 0, WD, HT, "#000")
+    for starpos in stars:
+        draw.draw_circle(starpos.x, starpos.y, 1, color = "white")
+    for i, pos in enumerate(planetpos):
+        draw.draw_circle(pos.x, pos.y, radii[i], filled = True, color = "blue")
+    draw.draw_line(lpos.x, lpos.y, rpos.x, rpos.y, color = "white")
+    front = center + (lpos - center).rot90()*5
+    draw.draw_line(front.x, front.y, lpos.x, lpos.y, color = "white")
+    draw.draw_line(front.x, front.y, rpos.x, rpos.y, color = "white")
+    if keyboard.w:
+        back = center + (center-front).normalize()*20
+        draw.draw_line(center.x, center.y, back.x, back.y, width = 2, color = "#f50")
+        back = (back-center) * 3/4 + center
+        draw.draw_line(center.x, center.y, back.x, back.y, width = 3, color = "#f70")
+        back = (back-center) * 2/3 + center
+        draw.draw_line(center.x, center.y, back.x, back.y, width = 4, color = "#fa0")
+        # back += (rpos-center)
+        # draw.draw_line(center.x, center.y, back.x, back.y, width = 2, color = "#230")
+        # back -= 2*(rpos-center)
+        # draw.draw_line(center.x, center.y, back.x, back.y, width = 2, color = "#230")
+        # back += (rpos-center)
+        back = (back-center) * 7/10 + center
+        draw.draw_line(center.x, center.y, back.x, back.y, width = 4, color = "#fc0")
+        back = (back-center) * 4/7 + center
+        draw.draw_line(center.x, center.y, back.x, back.y, width = 4, color = "#fe0")
+    if keyboard.a:
+        side = front + (lpos-center).normalize()*4
+        draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fa0")
+        side = (side-front) * 1/2 + front
+        draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fc0")
+        side = (side-front) * 1/2 + front
+        draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fe0")
+    if keyboard.d:
+        side = front + (rpos-center).normalize()*4
+        draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fa0")
+        side = (side-front) * 1/2 + front
+        draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fc0")
+        side = (side-front) * 1/2 + front
+        draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fe0")
+        
+
+def update(t):
+    global center, rad, xel, vel, lpos, rpos, planetpos, planetv, planetxel, rotvel
+    rad += math.pi*rotvel
+    planetxel = [Vec2(0, 0) for i in planetpos]
+    xel = Vec2(0, 0)
+    for i, pos in enumerate(planetpos):
+        for k, posa in enumerate(planetpos):
+            if i != k:
+                planetxel[i] += ((posa-pos).normalize()*g*planetm[k])/((posa-pos).norm()**2)#*planetm[i])
+        planetxel[i] += ((center-pos).normalize()*g*mass)/((center-pos).norm()**2)#*planetm[i])
+        if (pos-center).norm() > radii[i]:
+            xel += ((pos-center).normalize()*g*planetm[i])/((pos-center).norm()**2)#*mass)
+        planetv[i] += planetxel[i]
+        planetpos[i] += planetv[i]
+        planetpos[i] = Vec2(planetpos[i].x%WD, planetpos[i].y%HT)
+    if keyboard.w:
+        xel += (lpos-center).rot90().normalize()*0.1
+    if keyboard.a:
+        rotvel -= 0.0005
+        xel += (rpos-center).normalize()*0.01
+    if keyboard.d:
+        rotvel += 0.0005
+        xel += (lpos-center).normalize()*0.01
+    vel += xel
+    center += vel
+    center = Vec2(center.x%WD, center.y%HT)
+    lpos, rpos = l_rpos(center, rad, width)
+
+    draw_stuff()
+
+    window.requestAnimationFrame(update)
+    
+        
+update(0)
+</script>
+</body>
+</html>
