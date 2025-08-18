@@ -1,0 +1,537 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<link rel="stylesheet" 
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<link rel="stylesheet" href="pico.min.css">
+
+<main class="container" data-theme="light">
+<div class="grid">
+    <section>
+        <div id="error" style="color:red"></div>
+        <div class="grid">
+            <input type="text" 
+                   id="fillin"
+                   value=""
+                   placeholder="Input board here">
+        </div>
+        <div class="grid">
+            <button id="load">Load</button>
+            <button id="solve">Solve</button>
+            <button id="reset">Reset</button>
+            <button id="clear">Clear</button>
+        </div>
+    </section>
+    <section>
+        <div align="center">
+            <canvas id="canvas" width="600" height="600">
+            </canvas>
+        </div>
+    </section>
+</div>
+</main>
+  
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_game1']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_game1">
+CTX = None
+
+class Mouse:
+    def __init__(self, canvas):
+        self.canvas = canvas
+        self.ldown = False
+        self.rdown = False
+        self.pos = [0, 0]
+        self.canvas.bind("mousedown", self.onmousedown)
+        self.canvas.bind("mouseup", self.onmouseup)
+        self.canvas.bind("mousemove", self.onmousemove)
+    
+    def onmousedown(self, event):
+        if event.button == 0:
+            self.ldown = True
+        elif event.button == 1:
+            self.rdown = True
+        self.getpos(event)
+        
+    def onmouseup(self, event):
+        if event.button == 0:
+            self.ldown = False
+        elif event.button == 1:
+            self.rdown = False
+        self.getpos(event)
+        
+    def onmousemove(self, event):
+        self.getpos(event)
+     
+    def getpos(self, event):
+        rect = self.canvas.getBoundingClientRect()
+        self.pos[0] = event.clientX - rect.left
+        self.pos[1] = event.clientY - rect.top
+     
+
+def set_context(ctx):
+    global CTX
+    CTX = ctx
+
+def draw_line(x1, y1, x2, y2, color='black', width=1):
+    "Draw a line from (x1,y1) to (x2,y2)"
+    CTX.strokeStyle = color
+    CTX.lineWidth = width
+    CTX.beginPath()
+    CTX.moveTo(x1, y1)
+    CTX.lineTo(x2, y2)
+    CTX.stroke()
+
+
+def draw_circle(x, y, radius, color='black', filled=False, width=1):
+    "Draw a circle at (x,y) with given radius"
+    CTX.beginPath()
+    CTX.arc(x, y, radius, 0, math.pi * 2)
+    if (filled):
+        CTX.fillStyle = color
+        CTX.fill()
+    else:
+        CTX.strokeStyle = color
+        CTX.lineWidth = width
+        CTX.stroke()
+
+
+def draw_rect(x, y, width, height, color='black', filled=False, linewidth=1):
+    "Draw a rectangle at (x,y) with given width and height"
+    if (filled):
+        CTX.fillStyle = color
+        CTX.fillRect(x, y, width, height)
+    else:
+        CTX.strokeStyle = color
+        CTX.lineWidth = linewidth
+        CTX.strokeRect(x, y, width, height)
+
+
+def draw_text(text, x, y, color='black', font_size=12, font_family='Arial', 
+              centered=True, bold=False):
+    "Draw text at (x,y)"
+    CTX.fillStyle = color
+    CTX.font = f'{"bold" if bold else ""} {font_size}px {font_family}'
+    if centered: 
+        CTX.textAlign = 'center'
+        CTX.textBaseline = 'middle'
+    else:
+        CTX.textAlign = 'left'
+        CTX.textBaseline = 'alphabetic'
+    CTX.fillText(text, x, y)
+    
+    
+def draw_triangle(p1, p2, p3, color='black', width=1):
+    draw_line(*p1, *p2, color=color, width=width)
+    draw_line(*p2, *p3, color=color, width=width)
+    draw_line(*p3, *p1, color=color, width=width)
+      
+  
+def midpoint(p1, p2):
+    return ((p1[0] + p2[0]) / 2.0,
+            (p1[1] + p2[1]) / 2.0)
+    
+
+def midpoint_label(text, p1, p2, x_off=0, y_off=0, **kwargs):
+    pmid = midpoint(p1, p2)
+    draw_text(text, pmid[0] + x_off, pmid[1] + y_off, **kwargs)
+  
+
+def linterp(p1, p2, fraction):
+    "Return point that is fraction of the distance between p1 and p2"
+    incr = ((p2[0] - p1[0]) * fraction,(p2[1] - p1[1]) * fraction)
+    return (p1[0] + incr[0],
+            p1[1] + incr[1])
+    
+    
+def clear():
+    "Clear the entire canvas"
+    canvas = CTX.canvas
+    CTX.clearRect(0, 0, canvas.width, canvas.height)
+</script>
+
+<script type="text/python" id="pythoncode">
+import copy
+import math
+from browser import document, window, aio, console, bind, html
+from browser.widgets.dialog import Dialog
+
+from game1 import *
+
+set_context(document['canvas'].getContext('2d'))
+WD = document['canvas'].width
+HT = document['canvas'].height
+document.documentElement.setAttribute('data-theme', 'light');
+mouse = Mouse(document['canvas'])
+
+def firstnotnone(choices):
+    for choice in choices:
+        if choice is not None:
+            return choice
+    assert False, "Should not be called if there are no choices"
+
+def draw_choices(choices, x_start, y_start, x_end, y_end):
+    w = x_end - x_start
+    h = y_end - y_start
+    boxw = w/3
+    boxh = h/3
+    if not isinstance(choices, list):
+        color = 'black' if choices < 0 else 'red'
+        draw_text(str(abs(choices)), x_start+w/2, y_start+h/2, 
+                  font_size=0.7*h, color=color)
+    else:
+        for row in range(3):
+            for col in range(3):
+                i = 3*row + col
+                if choices[i] is not None:
+                    draw_text(str(choices[i]), 
+                              x_start + col*boxw+boxw/2, 
+                              y_start + row*boxh+boxh/2, 
+                              font_size = 0.6*boxh)
+
+class Board:
+    def __init__(self, board_to_copy=None):
+        self.square = None # square[rowcol to idx] = [remaining choices]
+        self.highlighted_cell: tuple | None = None
+        self.selected_cell: tuple | None = None
+        if board_to_copy is not None:
+            self.square = copy.deepcopy(board_to_copy.square)
+        else:
+            self.setup()
+
+    def setup(self):
+        placeholder = [i+1 for i in range(9)]
+        self.square = [list(placeholder) for i in range(9**2)]
+        self.selected_cell = None
+        
+    def elem(self, row, col):
+        choices = self.square[int(9 * row + col)]
+        if isinstance(choices, int):
+            return abs(choices)
+        return choices
+
+    def chooseitem(self, row, col, choice):
+        idx = abs(choice) - 1
+        assert 0 <= idx < 9
+        # Only choice here, change to a single int instead of a list
+        self.square[9 * row + col] = choice
+        # Choice not available on this col
+        for irow in range(9):
+            if irow != row and not self.is_chosen(irow, col):
+                self.elem(irow, col)[idx] = None
+        # Choice not available on this row
+        for icol in range(9):
+            if icol != col and not self.is_chosen(row, icol):
+                self.elem(row, icol)[idx] = None
+        # Choice not available in this square
+        row_start = row - row % 3
+        col_start = col - col % 3
+        for irow in range(int(row_start), int(row_start+3)):
+            for icol in range(int(col_start), int(col_start+3)):
+                if (irow != row) and (icol != col) and not self.is_chosen(irow, icol):
+                    self.elem(irow, icol)[idx] = None
+
+    def is_chosen(self, row, col):
+        """Return True if element at row, col has been fixed."""
+        return isinstance(self.elem(row, col), int)
+
+    def fillin_select(self, num):
+        if self.selected_cell is not None:
+            self.chooseitem(self.selected_cell[0], self.selected_cell[1], num)
+            self.selected_cell = (self.selected_cell[0] if self.selected_cell[1] < 8 else self.selected_cell[0]+1, (self.selected_cell[1]+1)%9)
+
+    def fillin(self, s):
+        """Fills in board with a puzzle. Use negative ints to signify fixed numbers."""
+        assert len(s) == 81
+        for i, c in enumerate(s):
+            if c == '.':
+                continue
+            console.log(c)
+            self.chooseitem(i // 9, i % 9, -int(c))
+        
+    def is_solved(self):
+        for row in range(9):
+            for col in range(9):
+                if not self.is_chosen(row, col):
+                    return False
+        return True
+                
+    def is_unsolvable(self):
+        for row in range(9):
+            for col in range(9):
+                if not self.is_chosen(row, col):
+                    if all(v is None for v in self.elem(row, col)):
+                        return True
+        # TODO: check row, col, square integrity
+        return False
+    
+    def cell_lookup(self, x, y):
+        boxw = WD / 9
+        boxh = HT / 9
+        return (y // boxh, x // boxw)
+    
+    def draw(self):
+        boxw = WD / 9
+        boxh = HT / 9
+
+        if self.selected_cell is not None:
+            r, c = self.selected_cell
+            draw_rect(c*boxw, r*boxh, boxw, boxh, linewidth=2, filled=True, color='#aaf')
+     
+        draw_line(0, 0, 0, HT, width=5)
+        draw_line(0, HT, WD, HT, width=5)
+        draw_line(WD, HT, WD, 0, width=5)
+        draw_line(WD, 0, 0, 0, width=5)
+        
+        for i in range(1, 10):
+            linewidth = 3 if (i % 3) == 0 else 1
+            draw_line(i*boxw, 0, i*boxw, HT, width=linewidth)
+            draw_line(0, i*boxh, WD, i*boxh, width=linewidth)
+
+        for row in range(9):
+            for col in range(9):
+                if (row, col) != self.selected_cell:
+                    draw_choices(self.square[9*row + col],
+                                 col*boxw, row*boxh, (col+1)*boxw, (row+1)*boxh)
+
+        if self.highlighted_cell is not None:
+            r, c = self.highlighted_cell
+            draw_rect(c*boxw+2, r*boxh+2, boxw-4, boxh-4, linewidth=2, color='#ff0')
+
+
+def find_next_autofill(b: Board):
+    # Check to see if there are any cells with only one choice
+    for i, choices in enumerate(b.square):
+        if isinstance(choices, list):
+            is_single_choice = sum(1 for v in choices if v is not None) == 1
+            if is_single_choice:
+                choice = firstnotnone(choices)
+                row = i // 9
+                col = i % 9
+                return row, col, choice
+    # For each row, see if there are numbers that can only go in one spot
+    for r in range(9):
+        unit = [(r, c, b.elem(r,c)) for c in range(9) if isinstance(b.elem(r,c), list)]
+        if unit:
+            row, col, choice = find_autofill_in_unit(unit)
+            if row is not None:
+                return row, col, choice
+    # For each col, see if there are numbers that can only go in one spot
+    for c in range(9):
+        unit = [(r, c, b.elem(r,c)) for r in range(9) if isinstance(b.elem(r,c), list)]
+        if unit:
+            row, col, choice = find_autofill_in_unit(unit)
+            if row is not None:
+                return row, col, choice
+    # For each box, see if there are numbers that can only go in one spot
+    for rs in [0, 3, 6]:
+        for cs in [0, 3, 6]:
+            # Box
+            unit = []
+            for r in range(rs, rs+3):
+                for c in range(cs, cs+3):
+                    elem = b.elem(r, c)
+                    if isinstance(elem, list):
+                        unit.append((r, c, elem))
+            if unit:
+                row, col, choice = find_autofill_in_unit(unit)
+                if row is not None:
+                    return row, col, choice
+    return None, None, None
+
+def find_autofill_in_unit(unit):
+    #unit: List[Tuple[row, col, choices]]
+    for choice in range(1, 10):
+        count = 0
+        lastrow, lastcol = 0, 0
+        for row, col, choices in unit:
+            if choice in choices:
+                count += 1
+                lastrow, lastcol = row, col
+        if count == 1:
+            return lastrow, lastcol, choice
+    return None, None, None
+
+    
+def choose_board_space_to_fill(b: Board):
+    lengths = []
+    for i, choices in enumerate(b.square):
+        if isinstance(choices, list):
+            lengths.append([i, len(choices)])
+    assert lengths, 'Should only be called when the board is not solved'
+    minimum = min(lengths, key = lambda x: x[1])
+    return minimum[0] // 9, minimum[0] % 9
+
+
+async def solve(b: Board, debug=False):
+    clear()
+    b.draw()
+    await aio.sleep(0)
+    #await aio.event(document['next'], 'click')
+    if b.is_solved():
+        return b
+    elif b.is_unsolvable():
+        return None
+    # First, see if there are any spaces to autofill (single choice for a cell)
+    row, col, choice = find_next_autofill(b)
+    if row is not None:
+        b.chooseitem(row, col, choice)
+        return await solve(b)    
+    # Otherwise, just have to guess and check
+    row, col = choose_board_space_to_fill(b)
+    choices = b.elem(row, col)
+    assert not isinstance(choices, int)
+    for i, choice in enumerate(choices):
+        if choice is None:
+            continue
+        bcopy = Board(board_to_copy=b)
+        bcopy.chooseitem(row, col, choice)
+        retval = await solve(bcopy)
+        if retval is not None:
+            return retval
+    return None
+    
+async def top_level_solve(b: Board):
+    document["error"].text = ''
+    solution = await solve(b)
+    if solution is None:
+        document["error"].text = "Board is unsolvable"
+        
+    
+#B.fillin('...26.7.168..7..9.19...45..82.1...4...46.29...5...3.28..93...74.4..5..367.3.18...')
+#B.fillin('...6..4..7....36......91.8...........5.18...3...3.6.45.4.2...6.9.3.......2....1..')
+#B.fillin('.2..........6....3.74.8.........3..2.8..4..1.6..5.........1.78.5....9..........4.')
+#B.draw()
+#B.fillin('.61..7..3.92..3..............853..........5.45....8....4......1...16.8..6........')
+#B.fillin('8..........36......7..9.2...5...7.......457.....1...3...1....6...85...1..9....4..')
+
+document['fillin'].value = \
+    '.61..7..3.92..3..............853..........5.45....8....4......1...16.8..6........'
+
+# Game state
+B: Board = None
+
+def redraw():
+    clear()
+    B.draw()
+
+def mouse_event_to_pos(canvas, event):
+    rect = canvas.getBoundingClientRect()
+    return (event.clientX - rect.left,
+            event.clientY - rect.top)
+
+@bind(document['canvas'], 'mousemove')
+def on_mousemove(evt):
+    console.log(evt)
+    x, y = mouse_event_to_pos(document['canvas'], evt)
+    B.highlighted_cell = B.cell_lookup(x, y)
+    redraw()
+
+@bind(document['canvas'], 'mouseup')
+def on_mouseup(evt):
+    x, y = mouse_event_to_pos(document['canvas'], evt)
+    cell = B.cell_lookup(x, y)
+    if B.selected_cell == cell:
+        cell = None
+    B.selected_cell = cell
+    redraw()
+
+@bind(document['canvas'], 'mouseleave')
+def on_mouseleave(evt):
+    B.highlighted_cell = None
+    redraw()
+    
+@bind(document['load'], "click")
+def on_fillin(evt):
+    global B
+    B.setup()
+    document['error'].text = ''
+    try:
+        B.fillin(document['fillin'].value)
+        redraw()
+    except AssertionError:
+        document['error'].text = 'Board must be of length 81 characters.'
+        return
+
+@bind(document['solve'], 'click')
+def on_solve(evt):
+    B.selected_cell = None
+    aio.run(top_level_solve(B))
+
+@bind(document['clear'], 'click')
+def on_clear(evt):
+    d = Dialog('Clear the board?', ok_cancel=True)
+
+    @bind(d.ok_button, 'click')
+    def ok(ev):
+        d.close()
+        B.setup()
+        redraw()
+
+def init():
+    global B
+    B = Board()
+    B.setup()
+    B.highlighted_cell = (1,1)
+    B.selected_cell = (2,1)
+    redraw()
+
+
+init()
+@bind(document, "keypress")
+def keyPressHandler(e):
+    global B
+    if e.key in "123456789":
+        B.fillin_select(-int(e.key))
+    if e.key == " ":
+        B.selected_cell = (B.selected_cell[0] if B.selected_cell[1] < 8 else B.selected_cell[0]+1, (B.selected_cell[1]+1)%9)
+    redraw()
+     
+
+</script>
+</body>
+</html>
