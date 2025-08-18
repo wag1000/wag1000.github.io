@@ -409,15 +409,18 @@ def choose_board_space_to_fill(b: Board):
     minimum = min(lengths, key = lambda x: x[1])
     return minimum[0] // 9, minimum[0] % 9
 
-
+solving = False
 async def solve(b: Board, debug=False):
+    #solving = True
     clear()
     b.draw()
     await aio.sleep(0)
     #await aio.event(document['next'], 'click')
     if b.is_solved():
+        #solving = False
         return b
     elif b.is_unsolvable():
+        #solving = False
         return None
     # First, see if there are any spaces to autofill (single choice for a cell)
     row, col, choice = find_next_autofill(b)
@@ -436,13 +439,20 @@ async def solve(b: Board, debug=False):
         retval = await solve(bcopy)
         if retval is not None:
             return retval
+    #solving = False
     return None
-    
+solved = False   
 async def top_level_solve(b: Board):
+    global solving, solved
+    solving = True
+    console.log(solving)
     document["error"].text = ''
     solution = await solve(b)
+    #solving = False
     if solution is None:
         document["error"].text = "Board is unsolvable"
+    else:
+        solved = True
         
     
 #B.fillin('...26.7.168..7..9.19...45..82.1...4...46.29...5...3.28..93...74.4..5..367.3.18...')
@@ -472,7 +482,9 @@ def on_mousemove(evt):
     #console.log(evt)
     x, y = mouse_event_to_pos(document['canvas'], evt)
     B.highlighted_cell = B.cell_lookup(x, y)
-    redraw()
+    console.log(f"{solving}, {solved}")
+    if (not solving) and (not solved):
+        redraw()
 
 @bind(document['canvas'], 'mouseup')
 def on_mouseup(evt):
@@ -486,12 +498,14 @@ def on_mouseup(evt):
 @bind(document['canvas'], 'mouseleave')
 def on_mouseleave(evt):
     B.highlighted_cell = None
-    redraw()
+    if (not solving) and (not solved):
+        redraw()
     
 @bind(document['load'], "click")
 def on_fillin(evt):
     global B
     B.setup()
+    solved = False
     document['error'].text = ''
     try:
         B.fillin(document['fillin'].value)
@@ -513,14 +527,16 @@ def on_clear(evt):
     def ok(ev):
         d.close()
         B.setup()
+        solved = False
         redraw()
 
 def init():
-    global B
+    global B, solved
     B = Board()
     B.setup()
     B.highlighted_cell = (1,1)
     B.selected_cell = (2,1)
+    solved = False
     redraw()
 
 
@@ -537,6 +553,7 @@ def keyUpHandler(e):
         B.fillin_select([i+1 for i in range(9)])
     redraw()
      
+
 
 </script>
 </body>
