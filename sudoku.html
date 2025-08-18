@@ -281,8 +281,11 @@ class Board:
 
     def fillin_select(self, num):
         if self.selected_cell is not None:
-            self.chooseitem(self.selected_cell[0], self.selected_cell[1], num)
-            self.selected_cell = (self.selected_cell[0] if self.selected_cell[1] < 8 else self.selected_cell[0]+1, (self.selected_cell[1]+1)%9)
+            self.square[9*self.selected_cell[0]+self.selected_cell[1]] = num
+            if num != [i+1 for i in range(9)]:
+                self.selected_cell = (self.selected_cell[0] if self.selected_cell[1] < 8 else self.selected_cell[0]+1, (self.selected_cell[1]+1)%9)
+            else:
+                self.selected_cell = (self.selected_cell[0] if self.selected_cell[1] > 0 else self.selected_cell[0]-1, (self.selected_cell[1]-1)%9)
 
     def fillin(self, s):
         """Fills in board with a puzzle. Use negative ints to signify fixed numbers."""
@@ -466,7 +469,7 @@ def mouse_event_to_pos(canvas, event):
 
 @bind(document['canvas'], 'mousemove')
 def on_mousemove(evt):
-    console.log(evt)
+    #console.log(evt)
     x, y = mouse_event_to_pos(document['canvas'], evt)
     B.highlighted_cell = B.cell_lookup(x, y)
     redraw()
@@ -522,13 +525,16 @@ def init():
 
 
 init()
-@bind(document, "keypress")
-def keyPressHandler(e):
+@bind(document, "keyup")
+def keyUpHandler(e):
     global B
+    console.log(e)
     if e.key in "123456789":
         B.fillin_select(-int(e.key))
     if e.key == " ":
         B.selected_cell = (B.selected_cell[0] if B.selected_cell[1] < 8 else B.selected_cell[0]+1, (B.selected_cell[1]+1)%9)
+    if e.key == "Backspace":
+        B.fillin_select([i+1 for i in range(9)])
     redraw()
      
 
