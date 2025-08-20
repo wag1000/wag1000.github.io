@@ -274,6 +274,14 @@ class Board:
                 if (irow != row) and (icol != col) and not self.is_chosen(irow, icol):
                     self.elem(irow, icol)[idx] = None
 
+    def redo(self):
+        for i, item in enumerate(self.square):
+            if not isinstance(item, int):
+                self.square[i] = [i+1 for i in range(9)]
+        for i, item in enumerate(self.square):
+            if isinstance(item, int):
+                self.chooseitem(i//9, i%9, item)
+    
     def is_chosen(self, row, col):
         """Return True if element at row, col has been fixed."""
         return isinstance(self.elem(row, col), int)
@@ -281,6 +289,8 @@ class Board:
     def fillin_select(self, num):
         if self.selected_cell is not None:
             self.square[9*self.selected_cell[0]+self.selected_cell[1]] = num
+            #self.chooseitem(self.selected_cell[0], self.selected_cell[1], num)
+            self.redo()
             if num != [i+1 for i in range(9)]:
                 self.selected_cell = (self.selected_cell[0] if self.selected_cell[1] < 8 else self.selected_cell[0]+1, (self.selected_cell[1]+1)%9)
             else:
