@@ -412,7 +412,7 @@ def draw_stuff():
 def shoot():
     global shotvel, shotpos, shotlife, score
     for i in range(int(-shots/2+0.5), int(shots/2+0.5)):
-        lead = vel*(center-turretpos).norm()/15
+        lead = vel*(center-turretpos).norm()/14
         spread = (((center-turretpos).norm()-1000)/-1500)+1
         basevel = (Vec2((center+lead).x%WD, (center+lead).y%HT)-turretpos).normalize()*15
         newvel = ((basevel/3) + (basevel.rot90().normalize()/shots)*i*spread).normalize()*15
