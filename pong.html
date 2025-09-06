@@ -318,7 +318,7 @@ def reset():
     xvel = 0
     while xvel < speed*0.8:
         xvel = random.uniform(0, speed)
-    ballvel = Vec2(xvel, random.uniform(-speed*0.8, speed*0.8))
+    ballvel = Vec2(xvel, random.uniform(-speed*0.8, speed*0.8)).normalize()*speed
     paddleh = HT/2
     aih = HT/2
     #score = 0
