@@ -1,0 +1,324 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<div align="center">
+<canvas id="canvas" 
+        width="1920" 
+        height="1080"></canvas>
+</div>
+<h1 id='text'></h1>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_Vec2', '__pwe_drawing']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_Vec2">
+import math
+from browser import document, window, aio
+
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    
+    def norm(self):
+        return math.sqrt(self.x**2 + self.y**2)
+    
+    def normalize(self):
+        n = self.norm()
+        if n != 0:
+            return Vec2(self.x/n, self.y/n)
+        raise ZeroDivisionError("vector has length zero")
+
+    def rot90(self):
+        return Vec2(self.y, -self.x)
+    
+    def rot270(self):
+        vec = self
+        for i in range(0, 2):
+            vec = vec.rot90()
+            
+    def __repr__(self):
+        return f"Vec2({self.x}, {self.y})"
+
+    def __eq__(self, vec):
+        return self.x == vec.x and self.y == vec.y
+            
+    def __add__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x + vec.x, self.y + vec.y)
+        return Vec2(self.x + vec, self.y + vec)
+    
+    def __radd__(self, n):
+        return Vec2(self.x + n, self.y + n)
+    
+    def __sub__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x - vec.x, self.y - vec.y)
+        return Vec2(self.x - vec, self.y - vec)
+    
+    def __mul__(self, n):
+        if isinstance(n, Vec2):
+            raise ValueError("no vector to vector multiplication")
+        return Vec2(self.x*n, self.y*n)
+    
+    def __rmul__(self, n):
+        return self*n
+    
+    def __truediv__(self, n):
+        return Vec2(self.x/n, self.y/n)
+    
+    def __getitem__(self, idx):
+        vec = [self.x, self.y]
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        return vec[idx]
+    
+    def __setitem__(self, idx, val):
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        if idx == -2:
+            self.x = val
+        elif idx == -1:
+            self.y = val
+        elif idx == 0:
+            self.x = val
+        elif idx == 1:
+            self.y = val
+
+
+            
+
+</script>
+
+<script type="text/python" id="__pwe_drawing">
+import math
+from browser import console
+
+class Drawing:
+    def __init__(self, CTX):
+        self.CTX = CTX
+
+        
+    def draw_circle(self, x, y, radius, color='black', filled=False, width=1):
+        "Draw a circle at (x,y) with given radius"
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, radius, 0, math.pi * 2)
+        if (filled):
+            self.CTX.fillStyle = color
+            self.CTX.fill()
+        else:
+            self.CTX.strokeStyle = color
+            self.CTX.lineWidth = width
+            self.CTX.stroke()
+        
+        
+    def drawRectangle(self, x, y, width, height, color):
+        self.CTX.fillStyle = color
+        self.CTX.fillRect(
+            round(x),
+            round(y),
+            round(width),
+            round(height)) 
+    
+
+    def draw_line(self, x1, y1, x2, y2, color='black', width=1):
+        "Draw a line from (x1,y1) to (x2,y2)"
+        self.CTX.strokeStyle = color
+        self.CTX.lineWidth = width
+        self.CTX.beginPath()
+        self.CTX.moveTo(x1, y1)
+        self.CTX.lineTo(x2, y2)
+        self.CTX.stroke()
+        
+    def draw_spring(self, pos1, pos2, peaks, color = "black", width = 1, springwidth = 10):
+        positions = []
+        diff = pos2 - pos1
+        for i in range(peaks+1):
+            if i%2 == 0:
+                pos = pos1 + ((diff/peaks)*i) + ((diff.normalize()*springwidth)).rot90()
+            else:
+                pos = pos1 + ((diff/peaks)*i) - ((diff.normalize()*springwidth)).rot90()
+            positions.append(pos)
+        for i in range(len(positions)-1):
+            pos = positions[i]
+            pos_2 = positions[i+1]
+            console.log(f"{pos == pos1}")
+            console.log(f"{pos_2 == pos1}")
+            self.draw_line(pos.x, pos.y, pos_2.x, pos_2.y, color, width)
+        positions = []
+        for i in range(peaks+1):
+            if i%2 == 0:
+                pos = pos1 + ((diff/peaks)*i) - ((diff.normalize()*springwidth)).rot90()
+            else:
+                pos = pos1 + ((diff/peaks)*i) + ((diff.normalize()*springwidth)).rot90()
+            positions.append(pos)
+        for i in range(len(positions)-1):
+            pos = positions[i]
+            pos_2 = positions[i+1]
+            console.log(f"{pos == pos1}")
+            console.log(f"{pos_2 == pos1}")
+            self.draw_line(pos.x, pos.y, pos_2.x, pos_2.y, color, width)
+            
+            
+</script>
+
+<script type="text/python" id="pythoncode">
+from Vec2 import Vec2
+from drawing import Drawing
+import math
+import time
+from browser import document, window, aio, console, bind
+
+canvas = document.getElementById("canvas")
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+
+Draw = Drawing(CTX)
+
+hex = {0:'0',
+       1:'1',
+       2:'2',
+       3:'3',
+       4:'4',
+       5:'5',
+       6:'6',
+       7:'7',
+       8:'8',
+       9:'9',
+       10:'a',
+       11:'b',
+       12:'c',
+       13:'d',
+       14:'e',
+       15:'f',
+       16:'0'
+        }
+
+def to_hex(a):
+    dig_2 = hex[round(a%16)]
+    dig_1 = hex[round(((a-a%16)/16)%16)]
+    return dig_1+dig_2
+
+def tograyscale(t):
+    return "#"+to_hex(t*255)+to_hex(t*255)+to_hex(t*255)
+
+class Slit:
+    def __init__(self, pos, w = 8, am = 1):
+        self.pos = pos
+        self.w = w
+        self.am = am
+
+    def addinterference(self, pos, phase):
+        d = (pos - self.pos).norm()+(phase%self.w)
+        new_amp = self.am/(0.001*d+1)
+        return new_amp*(math.sin(((d-d%self.w)/self.w)+1))
+
+class Experiment:
+    def __init__(self, slits, w = 2, am = 1, phase = 0):
+        self.slits = slits
+        self.slitlist = []
+        self.phase = phase
+        for i in range(1, slits+1):
+            self.slitlist.append(Slit(Vec2(i*WD/(slits+1), HT), w, am))
+        console.log('Made experiment')
+
+    def draw(self):
+        t_start = time.perf_counter()
+        for x in range(WD):
+            #console.log(f"x={x}")
+            for y in range(HT):
+                #console.log(f"y={y}")
+                brightness = 0
+                for slit in self.slitlist:
+                    brightness += slit.addinterference(Vec2(x, y), self.phase)
+                brightness = tograyscale(abs(brightness)/self.slits)
+                Draw.drawRectangle(x, y, 1, 1, brightness)
+                #console.log(f"Done with pixel {x}, {y}.")
+        console.log(f"time = {(time.perf_counter()-t_start)*1000} milliseconds")
+
+#experiment = Experiment(2, phase = 0/30)
+#experiment.draw()
+#redos = [60]
+# Prompt the user to choose a directory
+@bind(document, "keypress")
+def keyPressHandler(e):
+    if e.key == ' ':
+        aio.run(main())
+
+async def save_canvas_as_image(file_handle, canvas):
+    data_url = canvas.toDataURL("image/png")
+    response = await window.fetch(data_url)
+    blob = await response.blob()
+    writable = await file_handle.createWritable()
+    writable.write(blob)
+    writable.close()
+        
+async def main():
+    try:
+        directory_handle = await window.showDirectoryPicker()
+    except JavascriptError:
+        return
+    
+    n_frames = 120
+    for frame in range(0, n_frames):
+        #if frame in redos:
+        phase = frame / 30
+        console.log(f'Rendering frame {frame} with phase {phase}')
+        # Make unique filename
+        filename = f"frame{frame:03d}.png"
+        file_handle = await directory_handle.getFileHandle(filename, {'create': True})
+        # Render the image
+        experiment = Experiment(2, phase = phase)
+        experiment.draw()
+        # Save image to that file
+        await save_canvas_as_image(file_handle, canvas)
+
+        #break
+
+</script>
+</body>
+</html>
