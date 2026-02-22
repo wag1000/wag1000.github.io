@@ -204,7 +204,6 @@ class Drawing:
 </script>
 
 <script type="text/python" id="pythoncode">
-# Write python on this side
 from browser import document, window, aio, console, bind
 from Vec2 import Vec2
 from draw import Drawing
@@ -226,17 +225,23 @@ paused = False
 num = int(input("How many objects?"))
 coloured = int(input("How many objects should be coloured?"))
 if coloured > 0:
-    colour = input("What colour?\nWrite as 3 digit hexadecimal. ")
+    colour = input("What colour?\nWrite as 3 digit hexadecimal with a hash or a word. ")
+heavy = int(input("How many objects should be a different mass?"))
+if heavy > 0:
+    mass = input("What mass?")
 
 for i in range(num):
+    if i < int(heavy):
+        m.append(float(mass))
+    else:
+        m.append(1)
     pos = Vec2(random.randint(100, 2000), random.randint(100, 1000))
-    vel = Vec2(random.randint(-20, 20), random.randint(-20, 20))
+    vel = Vec2(random.randint(-20, 20), random.randint(-20, 20)).normalize()*30/m[-1]
     while pos in p or vel in v:
         pos = Vec2(random.randint(100, 2000), random.randint(100, 1000))
-        vel = Vec2(random.randint(-10, 10), random.randint(-10, 10))
+        vel = Vec2(random.randint(-10, 10), random.randint(-10, 10)).normalize()*30/m[-1]
     p.append(pos)
     v.append(vel)
-    m.append(1)
     if i < int(coloured):
         c.append(colour)
     else:
@@ -335,6 +340,12 @@ def circle_collide(pos1, pos2, r1, r2):
     dist = r1 + r2
     return (pos1 - pos2).norm() <= dist
 
+def energy():
+    e = 0
+    for i in range(len(v)):
+        e += v[i].norm()**2*m[i]
+    return e
+
 def update(t):
     global pos, v, expectedlen, paused, downlast
     dellist = []
@@ -364,9 +375,10 @@ def update(t):
                     dir = (posna-posn).normalize()
                     v1pa = v[i].dot(dir)*dir
                     v2pa = v[ia].dot(dir)*dir
-                    nv2pa = (2*m[i]/(m[i]+m[ia]))*v1pa + ((1 - m[i])/(m[ia]+m[i]))*v2pa
-                    console.log(nv2pa == v[ia])
-                    nv1pa = v1pa*m[i]+v2pa*m[ia]-nv2pa*m[ia]
+                    # nv2pa = (2*m[i]/(m[i]+m[ia]))*v1pa + ((1 - m[i])/(m[ia]+m[i]))*v2pa
+                    # nv1pa = v1pa*m[i]+v2pa*m[ia]-nv2pa*m[ia]
+                    nv1pa = (v1pa*(m[i] - m[ia])/(m[i] + m[ia]))+(v2pa*(2*m[ia])/(m[i] + m[ia]))
+                    nv2pa = (v2pa*(m[ia] - m[i])/(m[ia] + m[i]))+(v1pa*(2*m[i])/(m[ia] + m[i]))
                     v[i] = nv1pa + (v[i]-v1pa)
                     v[ia] = nv2pa + (v[ia]-v2pa)
                     
@@ -381,7 +393,7 @@ def update(t):
     #             dellist[ia] = item - 1
     #     p.pop(i)
     #     v.pop(i)
-
+    console.log(energy())
     draw()
     keyboard.clearall()
     window.requestAnimationFrame(update)
@@ -390,10 +402,10 @@ def draw():
     Draw.drawRectangle(0, 0, canvas.width, canvas.height, "#fff")
     for i, pos in enumerate(p):
         Draw.draw_circle(pos.x, pos.y, radius = 20, color = c[i], filled = True)
-    Draw.draw_line(20, 0, 20, 1200)
-    Draw.draw_line(2380, 0, 2380, 1200)
-    Draw.draw_line(0, 20, 2400, 20)
-    Draw.draw_line(0, 1180, 2400, 1180)
+    Draw.draw_line(20, 20, 20, HT-20)
+    Draw.draw_line(WD-20, 20, WD-20, HT-20)
+    Draw.draw_line(20, 20, WD-20, 20)
+    Draw.draw_line(20, HT-20, WD-20, HT-20)
 
     
 update(0)      
