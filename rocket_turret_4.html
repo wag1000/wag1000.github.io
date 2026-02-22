@@ -300,7 +300,7 @@ vel = Vec2(0, 0)
 stars = [Vec2(random.randint(0, WD), random.randint(0, HT)) for i in range(50)]
 # draw_rect(Vec2(200, 600), Vec2(500, 700), 500, "green")
 planetpos = [Vec2(800, 600), Vec2(1000, 600)]
-planetv = [Vec2(0, 0), Vec2(0, -1.5)]
+planetv = [Vec2(0, 0), Vec2(0, -5)]
 planetxel = [Vec2(0, 0) for i in planetpos]
 planetm = [100, 20]
 radii = [20, 10]
@@ -326,10 +326,13 @@ deathpos = None
 score = 0
 basetime = 0
 time_s = 0
+turretsound = window.Audio.new(window.SOUNDS['turret'])
 def init():
-    global center, rad, rotvel, xel, vel, lpos, rpos, planetpos, planetv, planetxel, planetm, radii, shots, shotpos, shotvel, shotlife, t, dead, start, score, basetime, time_s, turretpos, tv
+    global center, rad, rotvel, xel, vel, lpos, rpos, planetpos, planetv, planetxel, planetm, radii, shots, shotpos, shotvel, shotlife, t, dead, start, score, basetime, time_s, turretpos, tv, turretsound
     if justdied:
         deathpos = center
+    turretsound.currentTime = 0
+    turretsound.play()
     center = Vec2(400, 600)
     #length = 100
     #width = 10
@@ -356,7 +359,7 @@ def init():
     dead = False
     start = False
     score = 0
-    basetime = time.perf_counter()
+    basetime = t
     time_s = 0
     turretpos = Vec2(2000, 600)
     tv = Vec2(random.uniform(-2, 2), random.uniform(-2, 2)).normalize()*3
@@ -379,8 +382,9 @@ def keyUpHandler(e):
         start = False
         dead = False
         init()
-
+audioengine = window.Audio.new(window.SOUNDS['engine2'])
 def draw_stuff():
+    global audioengine, front
     draw.drawRectangle(0, 0, WD, HT, "#000")
     for starpos in stars:
         draw.draw_circle(starpos.x, starpos.y, 1, color = "white")
@@ -418,6 +422,10 @@ def draw_stuff():
         draw.draw_line(center.x, center.y, back.x, back.y, width = 4, color = "#fc0")
         back = (back-center) * 4/7 + center
         draw.draw_line(center.x, center.y, back.x, back.y, width = 4, color = "#fe0")
+        audioengine.loop = True
+        audioengine.play(0)
+    else:
+        audioengine.pause()
     if keyboard.a:
         side = front + (lpos-center).normalize()*4
         draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fa0")
@@ -433,8 +441,9 @@ def draw_stuff():
         side = (side-front) * 1/2 + front
         draw.draw_line(front.x, front.y, side.x, side.y, width = 2, color = "#fe0")
     if dead:
+        audioengine.pause()
         draw.draw_text("YOU LOSE", WD/2, HT/2, "#fff", 450)
-    draw.draw_text(f"Time Survived: {time_s:.2f} seconds", 200, 20, "#fff", 30)
+    draw.draw_text(f"Time Survived: {time_s} ticks", 200, 20, "#fff", 30)
     if start:
         draw.draw_text("Press Space to Start", WD/2, HT/2, "#fff", 200)
 def shoot():
@@ -466,7 +475,7 @@ def touching_shots():
 def update(a):
     global center, rad, xel, vel, lpos, rpos, planetpos, planetv, planetxel, rotvel, t, shotpos, shotvel, shotlife, dead, time_s, turretpos, tv
     if not start and not dead:
-        time_s = time.perf_counter()-basetime
+        time_s = t-basetime
         rad += math.pi*rotvel
         planetxel = [Vec2(0, 0) for i in planetpos]
         xel = Vec2(0, 0)
@@ -476,8 +485,7 @@ def update(a):
                 if i != k:
                     planetxel[i] += ((posa-pos).normalize()*g*planetm[k])/((posa-pos).norm()**2)#*planetm[i])
             planetxel[i] += ((center-pos).normalize()*g*mass)/((center-pos).norm()**2)#*planetm[i])
-            if (pos-center).norm() > radii[i]:
-                xel += ((pos-center).normalize()*g*planetm[i])/((pos-center).norm()**2)#*mass)
+            xel += ((pos-center).normalize()*g*planetm[i])/((pos-center).norm()**2)#*mass)
             planetv[i] += planetxel[i]
             planetpos[i] += planetv[i]
             planetpos[i] = Vec2(planetpos[i].x%WD, planetpos[i].y%HT)
@@ -487,7 +495,7 @@ def update(a):
             shotlife[i] -= 1
             shotpos[i] += avel
             shotpos[i] = Vec2(shotpos[i].x%WD, shotpos[i].y%HT)
-            if shotlife[i] == 0 or avel.norm() > 20:
+            if shotlife[i] == 0 or avel.norm() > 50:
                 shotpos.pop(i)
                 shotvel.pop(i)
                 shotlife.pop(i)
@@ -510,12 +518,16 @@ def update(a):
     
         if touching_shots():
             dead = True
+            turretsound.pause()
             #init()
-            audio = window.Audio.new(window.SOUNDS['you_lose'])
+            audio = window.Audio.new(window.SOUNDS['you_lose2'])
             audio.play()
+            audio2 = window.Audio.new(window.SOUNDS['you_lose'])
+            audio2.play()
     
-        draw_stuff()
+    
         t += 1
+        draw_stuff()
     window.requestAnimationFrame(update)
 
 
