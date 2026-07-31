@@ -1,0 +1,411 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<meta name="viewport" 
+      content="width=device-width, initial-scale=1.0" />
+
+<link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<link rel="stylesheet" href="pico.min.css">
+
+<style>
+html, body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    margin: 0;
+    background-color: #887ecb;
+
+    .canvas-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    canvas {
+        background-color: #50459b;
+        max-width: 100%;
+        max-height: 100%;
+    }
+}
+</style>
+
+<div class="canvas-container">
+    <section>
+    <canvas id="canvas" width="1200" height="1200"></canvas>
+    </section>
+    <section>
+        <textarea id="rule" rows="1" cols="30" style="background-color: white;" placeholder="Rulestring"></textarea>
+        <textarea id="size" rows="1" cols="30" style="background-color: white;" placeholder="Grid size"></textarea>
+        <textarea id="speed" rows="1" cols="30" style="background-color: white;" placeholder="Hertz"></textarea>
+        <button id="run">Start</button>
+    </section>
+</div>
+
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_Vec2', '__pwe_Mouse', '__pwe_drawing']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_Vec2">
+import math
+from browser import document, window, aio
+
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    
+    def norm(self):
+        return math.sqrt(self.x**2 + self.y**2)
+    
+    def normalize(self):
+        n = self.norm()
+        if n != 0:
+            return Vec2(self.x/n, self.y/n)
+        raise ZeroDivisionError("vector has length zero")
+
+    def rot90(self):
+        return Vec2(self.y, -self.x)
+    
+    def rot270(self):
+        vec = self
+        for i in range(0, 2):
+            vec = vec.rot90()
+
+    def dot(self, v):
+        return self.x*v.x+self.y*v.y
+            
+    def __repr__(self):
+        return f"Vec2({self.x}, {self.y})"
+
+    def __eq__(self, vec):
+        return self.x == vec.x and self.y == vec.y
+            
+    def __add__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x + vec.x, self.y + vec.y)
+        return Vec2(self.x + vec, self.y + vec)
+    
+    def __radd__(self, n):
+        return Vec2(self.x + n, self.y + n)
+    
+    def __sub__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x - vec.x, self.y - vec.y)
+        return Vec2(self.x - vec, self.y - vec)
+    
+    def __mul__(self, n):
+        if isinstance(n, Vec2):
+            raise ValueError("no vector to vector multiplication")
+        return Vec2(self.x*n, self.y*n)
+    
+    def __rmul__(self, n):
+        return self*n
+    
+    def __truediv__(self, n):
+        return Vec2(self.x/n, self.y/n)
+    
+    def __getitem__(self, idx):
+        vec = [self.x, self.y]
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        return vec[idx]
+    
+    def __setitem__(self, idx, val):
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        if idx == -2:
+            self.x = val
+        elif idx == -1:
+            self.y = val
+        elif idx == 0:
+            self.x = val
+        elif idx == 1:
+            self.y = val
+
+
+            
+
+</script>
+
+<script type="text/python" id="__pwe_Mouse">
+class Mouse:
+    def __init__(self, canvas):
+        self.canvas = canvas
+        self.ldown = False
+        self.rdown = False
+        self.pos = [0, 0]
+        self.canvas.bind("mousedown", self.onmousedown)
+        self.canvas.bind("mouseup", self.onmouseup)
+        self.canvas.bind("mousemove", self.onmousemove)
+    
+    def onmousedown(self, event):
+        if event.button == 0:
+            self.ldown = True
+        elif event.button == 1:
+            self.rdown = True
+        self.getpos(event)
+        
+    def onmouseup(self, event):
+        if event.button == 0:
+            self.ldown = False
+        elif event.button == 1:
+            self.rdown = False
+        self.getpos(event)
+        
+    def onmousemove(self, event):
+        self.getpos(event)
+     
+    def getpos(self, event):
+        rect = self.canvas.getBoundingClientRect()
+        self.pos[0] = event.clientX - rect.left
+        self.pos[1] = event.clientY - rect.top
+</script>
+
+<script type="text/python" id="__pwe_drawing">
+import math
+from browser import console
+
+class Drawing:
+    def __init__(self, CTX):
+        self.CTX = CTX
+
+        
+    def circle(self, x, y, radius, color='black', filled=False, width=1):
+        "Draw a circle at (x,y) with given radius"
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, radius, 0, math.pi * 2)
+        if (filled):
+            self.CTX.fillStyle = color
+            self.CTX.fill()
+        else:
+            self.CTX.strokeStyle = color
+            self.CTX.lineWidth = width
+            self.CTX.stroke()
+
+
+    def gradient_dot(self, x, y, inner_rad, outer_rad, colors=['#000f', '#0000'], radii=[0, 1]):
+        gradient = self.CTX.createRadialGradient(x, y, inner_rad, x, y, outer_rad)
+        for i, color in enumerate(colors):
+            gradient.addColorStop(radii[i], color)
+        
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, outer_rad, 0, math.pi*2)
+        self.CTX.fillStyle = gradient
+        self.CTX.fill()
+        
+        
+    def rect(self, x, y, width, height, color):
+        self.CTX.fillStyle = color
+        self.CTX.fillRect(
+            round(x),
+            round(y),
+            round(width),
+            round(height)) 
+    
+
+    def line(self, x1, y1, x2, y2, color='black', width=1):
+        "Draw a line from (x1,y1) to (x2,y2)"
+        self.CTX.strokeStyle = color
+        self.CTX.lineWidth = width
+        self.CTX.beginPath()
+        self.CTX.moveTo(x1, y1)
+        self.CTX.lineTo(x2, y2)
+        self.CTX.stroke()
+
+
+    def text(self, text, x, y, color='black', font_size=12, font_family='Arial', 
+              centered=True, bold=False):
+        "Draw text at (x,y)"
+        self.CTX.fillStyle = color
+        self.CTX.font = f'{"bold" if bold else ""} {font_size}px {font_family}'
+        if centered: 
+            self.CTX.textAlign = 'center'
+            self.CTX.textBaseline = 'middle'
+        else:
+            self.CTX.textAlign = 'left'
+            self.CTX.textBaseline = 'alphabetic'
+        self.CTX.fillText(text, x, y)
+        
+            
+            
+</script>
+
+<script type="text/python" id="pythoncode">
+from Vec2 import Vec2
+from Mouse import Mouse
+from drawing import Drawing
+import math
+import random
+import time
+from browser import document, window, aio, console, bind
+
+canvas = document.getElementById("canvas")
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+mouse = Mouse(canvas)
+
+Draw = Drawing(CTX)
+grid_rez = 50
+rule = "LR"
+convert = {'R':'1',
+          'U':'2',
+          'L':'3',
+          'C':'4'}
+n_rule = [convert[char] for char in rule]
+rule = n_rule
+def rand_color():
+    return "#" + random.choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f']) + random.choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f']) + random.choice(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'])
+colors = [rand_color() for char in rule]
+ant = 0#[grid_rez//2, grid_rez//2]
+directions = [1, grid_rez, -1, -grid_rez]
+direction = 3
+gridwd = WD/grid_rez
+paused = True
+step = False
+startedon = False
+grid = [[0, (i%grid_rez)*gridwd, (i // grid_rez)*gridwd] for i in range(grid_rez**2)]
+changed = []
+change = False
+n_cycles = 1
+def init():
+    global grid_rez, rule, convert, n_rule, colors, ant, directions, direction, gridwd, paused, step, startedon, grid, changed, change, n_cycles
+    grid_rez = int(document['size'].value)
+    rule = document['rule'].value.upper()
+    convert = {'R':'1',
+              'U':'2',
+              'L':'3',
+              'C':'4'}
+    n_rule = [convert[char] for char in rule]
+    rule = n_rule
+    colors = [rand_color() for char in rule]
+    ant = grid_rez//2+grid_rez*grid_rez//2
+    directions = [1, grid_rez, -1, -grid_rez]
+    direction = 3
+    gridwd = WD/grid_rez
+    paused = True
+    step = False
+    startedon = False
+    grid = [[0, (i%grid_rez)*gridwd, (i // grid_rez)*gridwd] for i in range(grid_rez**2)]
+    changed = []
+    change = False
+    n_cycles = int(document['speed'].value) // 60
+
+
+@bind(document, "keypress")
+def on_key(e):
+    global paused, step
+    if e.key == ' ':
+        paused = not paused
+    if e.key == 's':
+        step = True
+
+@bind(document['speed'], 'change')
+def new_tickspeed(e):
+    global n_cycles
+    n_cycles = int(document['speed'].value) // 60
+
+#def on_ldown(e):
+#    global startedon
+#    if e.button == 0:
+#        startedon = grid[round(mouse.pos[0]//gridwd)+round(mouse.pos[1]//gridwd)*grid_rez][0]
+def draw():
+    global change, changed
+    #console.log(changed)
+    if change:
+        for i in changed:
+            item = grid[i]
+            Draw.rect(item[1], item[2], gridwd, gridwd, color=colors[item[0]])
+    changed = []
+    change = False
+    
+    #Draw.text(str(ticks), 50, 20)
+    Draw.rect((ant % grid_rez)*gridwd, (ant // grid_rez)*gridwd, gridwd, gridwd, color="#ff0")
+
+
+#canvas.bind("mousedown", on_ldown)
+def update(t):
+    global ant, direction, grid, step, change, changed, ticks
+    if (not paused) or step:
+        for i in range(n_cycles):
+            change = True
+            changed.append(ant)
+            console.log(ant)
+            direction += int(rule[grid[ant][0]])
+            direction = direction%4
+            grid[ant][0] = (grid[ant][0] +1)%len(rule)
+            ant += directions[direction]
+            ant = ant%grid_rez**2
+            # ant[0] = ant[0] % grid_rez
+            # ant[1] += directions[direction][1]
+            # ant[1] = ant[1] % grid_rez
+        #if mouse.ldown:
+            #change = True
+            #changed.append(round(mouse.pos[0]//gridwd)+round(mouse.pos[1]//gridwd)*grid_rez)
+            #grid[round(mouse.pos[0]//gridwd)+round(mouse.pos[1]//gridwd)*grid_rez][0] = not startedon
+        step = False
+    draw()
+    window.requestAnimationFrame(update)
+    
+    #update(t+1)
+
+def start():
+    Draw.rect(0, 0, WD, HT, color=colors[0])
+    update(0)
+
+
+@bind(document['run'], "click")
+def full_start(e):
+    global ticks
+    init()
+    start()
+</script>
+</body>
+</html>
