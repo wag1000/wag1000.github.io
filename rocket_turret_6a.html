@@ -315,11 +315,11 @@ xel = Vec2(0, 0)
 vel = Vec2(0, 0)
 stars = [Vec2(random.randint(0, WD), random.randint(0, HT)) for i in range(50)]
 # draw_rect(Vec2(200, 600), Vec2(500, 700), 500, "green")
-planetpos = [Vec2(800, 600), Vec2(1000, 600)]
-planetv = [Vec2(0, 0), Vec2(0, -5)]
+planetpos = [Vec2(800, 600), Vec2(1000, 600), Vec2(800, 0), Vec2(1000, 0), Vec2(2000, 600), Vec2(1200, 600)]
+planetv = [Vec2(0, 0), Vec2(0, -5), Vec2(0, 0), Vec2(0, -5), Vec2(0, 0), Vec2(0, -5)]
 planetxel = [Vec2(0, 0) for i in planetpos]
-planetm = [100, 20]
-radii = [20, 10]
+planetm = [100, 20, 100, 20, 100, 20]
+radii = [20, 10, 20, 10, 20, 10]
 turretpos = Vec2(2000, 600)
 tv = Vec2(random.uniform(-2, 2), random.uniform(-2, 2)).normalize()*3
 shots = 1
@@ -365,11 +365,11 @@ def init():
     #stars = [Vec2(random.randint(0, WD), random.randint(0, HT)) for i in range(50)]
     # draw_rect(Vec2(200, 600), Vec2(500, 700), 500, "green")
     lpos, rpos = l_rpos(center, rad, width)
-    planetpos = [Vec2(800, 600), Vec2(1000, 600)]
-    planetv = [Vec2(0, 0), Vec2(0, -1.5)]
+    planetpos = [Vec2(800, 600), Vec2(1000, 600), Vec2(800, 0), Vec2(1000, 0), Vec2(2000, 600), Vec2(1200, 600)]
+    planetv = [Vec2(0, 0), Vec2(0, -5), Vec2(0, 0), Vec2(0, -5), Vec2(0, 0), Vec2(0, -5)]
     planetxel = [Vec2(0, 0) for i in planetpos]
-    planetm = [100, 20]
-    radii = [20, 10]
+    planetm = [100, 20, 100, 20, 100, 20]
+    radii = [20, 10, 20, 10, 20, 10]
     #turretpos = Vec2(2000, 600)
     shots = 1
     shotpos = []
@@ -441,6 +441,7 @@ class Smoke:
 audioengine = window.Audio.new(window.SOUNDS['engine3'])
 def draw_stuff():
     global audioengine, front
+    console.log(len(radii))
     draw.drawRectangle(0, 0, WD, HT, "#000")
     CTX.drawImage(bg, -65, -200)
     for i, pos in enumerate(planetpos):
@@ -468,7 +469,7 @@ def draw_stuff():
         draw.draw_circle(deathpos.x, deathpos.y, rad_, filled = True, color = "#fa0d")
         rad_ = 10
         draw.draw_circle(deathpos.x, deathpos.y, rad_, filled = True, color = "#fe0e")
-    if keyboard.w and engines:
+    if keyboard.w and engines and not start and not dead:
         #if t%5 == 0:
         smoke_list.append(Smoke((center+10*(center-lpos).rot90())+(center-lpos)*(random.random()-0.5)*5, vel+(center-lpos).rot90()+(center-lpos)*(random.random()-0.5)*0.125))
         audioengine.play()
@@ -583,7 +584,7 @@ def update(a=0):
         for i, pos in enumerate(planetpos):
             tv += ((pos-tv).normalize()*g*planetm[i])/((pos-tv).norm()**2)
             for k, posa in enumerate(planetpos):
-                if i != k:
+                if (pos-posa).norm() >= radii[i]:
                     planetxel[i] += ((posa-pos).normalize()*g*planetm[k])/((posa-pos).norm()**2)#*planetm[i])
             planetxel[i] += ((center-pos).normalize()*g*mass)/((center-pos).norm()**2)#*planetm[i])
             if (pos-center).norm() >= radii[i]:
