@@ -483,7 +483,7 @@ def draw_stuff():
     if dead:
         audioengine.pause()
         draw.draw_text("YOU DIED", WD/2, HT/2, "#fff", 450)
-    draw.draw_text(f"Time Survived: {time_s} ticks", 200, 20, "#fff", 30)
+    draw.draw_text(f"Time Survived: {time_s/60:.2f} seconds", 200, 20, "#fff", 30)
     r = "0123456789abcdef"[max([min([round((10-(hull-10))*1.5), 15]), 0])]
     g = "0123456789abcdef"[max([min([round(hull*1.5), 15]), 0])]
     s = f"Hull: {max([hull, 0])}"
@@ -491,7 +491,11 @@ def draw_stuff():
         s = s[:-2]
     draw.draw_text(s, WD/2+400, 20, f"#{r}{g}{0}", 30)
     if start:
-        draw.draw_text("Press Space to Start", WD/2, HT/2, "#fff", 200)
+        draw.draw_text("Survive the Turret", WD/2, HT/2-200, "#fff", 200)
+        draw.draw_text("(You can't)", WD/2, HT/2-120, "#fff", 10)
+        draw.draw_text("In Survive the Turret, you must survive the Turret.", WD/2, HT/2+200, "#fff", 40)
+        draw.draw_text("There is no way to win.", WD/2, HT/2+250, "#fff", 40)
+        draw.draw_text("Good Luck!", WD/2, HT/2+300, "#fff", 40)
 def shoot():
     global shotvel, shotpos, shotlife, score, tv
     for i in range(int(-shots/2+0.5), int(shots/2+0.5)):
