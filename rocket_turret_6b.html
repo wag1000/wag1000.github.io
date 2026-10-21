@@ -432,9 +432,10 @@ class Smoke:
     def draw(self):
         r = "0123456789abcdef"[round(15-self.age/20)]
         b = "0123456789abcdef"[round(self.age/40)]
+        g = "0123456789abcdef"[max([round(10-self.age/5), 5])]
         i = "0123456789abcdef"[round(15-self.age*3/40)]
         radius = 10+self.age/10
-        draw.draw_circle(self.pos.x, self.pos.y, radius, color=f"#{r}5{b}{i}", filled=True)
+        draw.draw_circle(self.pos.x, self.pos.y, radius, color=f"#{r}{g}{b}{i}", filled=True)
         
 
 
